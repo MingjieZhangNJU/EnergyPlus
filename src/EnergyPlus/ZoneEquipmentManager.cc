@@ -3995,6 +3995,7 @@ namespace EnergyPlus::ZoneEquipmentManager {
                 Real64 FinalTotalReturnMassFlow = 0;
                 CalcZoneReturnFlows(state, ZoneNum, StdTotalReturnMassFlow, FinalTotalReturnMassFlow);
                 MassConservation(ZoneNum).RetMassFlowRate = FinalTotalReturnMassFlow;
+                ZoneReturnAirMassFlowRate = FinalTotalReturnMassFlow;
 
                 // Set zone infiltration flow rate
                 if (ZoneAirMassFlow.InfiltrationTreatment != NoInfiltrationFlow) {
@@ -4232,7 +4233,7 @@ namespace EnergyPlus::ZoneEquipmentManager {
                     }
                     // if zone mass balance true, set to expected return flow
                     if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance ) {
-                        returnNodeMassFlow = ExpTotalReturnMassFlow;
+                        returnNodeMassFlow = returnSchedFrac * ExpTotalReturnMassFlow;
                     }
                 } else {
                     returnNodeMassFlow = 0.0;
@@ -4266,7 +4267,7 @@ namespace EnergyPlus::ZoneEquipmentManager {
                         }
                         // if zone mass balance true, set to expected return flow
                         if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance ) {
-                            returnNodeMassFlow = ExpTotalReturnMassFlow; 
+                            returnNodeMassFlow = returnSchedFrac * ExpTotalReturnMassFlow; 
                         }
                     }
                 }
