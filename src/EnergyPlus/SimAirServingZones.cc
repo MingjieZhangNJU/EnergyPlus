@@ -2287,6 +2287,7 @@ namespace EnergyPlus::SimAirServingZones {
             // set the flag to true if the zones are not in the same airloop
             if (receivingZoneAirLoopNum != sourceZoneAirLoopNum ) {
                 state.dataAirLoop->AirLoopFlow(receivingZoneAirLoopNum).ZonesNotInSingleAirLoop = true;
+                state.dataAirLoop->AirLoopFlow(sourceZoneAirLoopNum).ZonesNotInSingleAirLoop = true;
             } 
         }
     }

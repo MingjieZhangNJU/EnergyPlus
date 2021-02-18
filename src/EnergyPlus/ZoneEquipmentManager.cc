@@ -3947,7 +3947,6 @@ namespace EnergyPlus::ZoneEquipmentManager {
                     }
                 }
 
-                Real64 returnSchedFrac = 1.0;
                 // Include zone mixing mass flow rate
                 if (ZoneMassBalanceFlag(ZoneNum)) {
                     int NumRetNodes = state.dataZoneEquip->ZoneEquipConfig(ZoneNum).NumReturnNodes;
@@ -3989,7 +3988,7 @@ namespace EnergyPlus::ZoneEquipmentManager {
                     }
                 } else {
                     state.dataZoneEquip->ZoneEquipConfig(ZoneNum).ExcessZoneExh = 0.0;
-                    StdTotalReturnMassFlow = max(0.0, returnSchedFrac * StdTotalReturnMassFlow);
+                    StdTotalReturnMassFlow = max(0.0, StdTotalReturnMassFlow);
                 }
 
                 Real64 FinalTotalReturnMassFlow = 0;
@@ -4231,10 +4230,6 @@ namespace EnergyPlus::ZoneEquipmentManager {
                         returnNodeMassFlow = inletMassFlow;
                         thisZoneEquip.FixedReturnFlow(returnNum) = true;
                     }
-                    // if zone mass balance true, set to expected return flow
-                    if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance ) {
-                        if (thisAirLoopFlow.ZonesNotInSingleAirLoop) returnNodeMassFlow = ExpTotalReturnMassFlow;
-                    }
                 } else {
                     returnNodeMassFlow = 0.0;
                 }
@@ -4265,21 +4260,72 @@ namespace EnergyPlus::ZoneEquipmentManager {
                                 returnNodeMassFlow = max(0.0, (ExpTotalReturnMassFlow * returnSchedFrac * airLoopReturnFrac));
                             }
                         }
-                        // if zone mass balance true, set to expected return flow
-                        if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance) {
-                            int airLoop = thisZoneEquip.ReturnNodeAirLoopNum(returnNum);
-                            if (airLoop > 0) {
-                                if (state.dataAirLoop->AirLoopFlow(airLoop).ZonesNotInSingleAirLoop) {
-                                    returnNodeMassFlow = ExpTotalReturnMassFlow;
-                                }
-                            }
-                        }
                     }
                 }
                 totReturnFlow += returnNodeMassFlow;
                 retNodeData.MassFlowRate = returnNodeMassFlow;
                 retNodeData.MassFlowRateMinAvail = 0.0;
                 if (!thisZoneEquip.FixedReturnFlow(returnNum)) totVarReturnFlow += returnNodeMassFlow;
+            }
+        }
+
+        // if zone mass balance true, set to expected return flow
+        if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance && ExpTotalReturnMassFlow > 0.0) {
+            // set air flow rate for each return node
+            Real64 totReturnFlow2 = 0.0;
+            Real64 returnNodeMassFlow = 0.0;
+            for (int returnNum = 1; returnNum <= numRetNodes; ++returnNum) {
+                if (numRetNodes == 1) {
+                    int retNode = thisZoneEquip.ReturnNode(returnNum);
+                    if (retNode > 0) {
+                        int airLoop = thisZoneEquip.ReturnNodeAirLoopNum(returnNum);
+                        if (airLoop > 0) {
+                            auto &thisAirLoopFlow(state.dataAirLoop->AirLoopFlow(airLoop));
+                            if (thisAirLoopFlow.ZonesNotInSingleAirLoop) {
+                                returnNodeMassFlow = ExpTotalReturnMassFlow;
+                            }
+                        }
+                    }
+                } else { // multiple return nodes
+                    int retNode = thisZoneEquip.ReturnNode(returnNum);
+                    if (retNode > 0) {
+                        int airLoop = thisZoneEquip.ReturnNodeAirLoopNum(returnNum);
+                        if (airLoop > 0) {
+                            auto &thisAirLoopFlow(state.dataAirLoop->AirLoopFlow(airLoop));
+                            if (thisAirLoopFlow.ZonesNotInSingleAirLoop) {
+                                Real64 returnAdjFactor = DataLoopNode::Node(retNode).MassFlowRate / ExpTotalReturnMassFlow;
+                                returnNodeMassFlow = returnAdjFactor * ExpTotalReturnMassFlow;
+                            }
+                        }
+                    }
+                }
+                totReturnFlow2 += returnNodeMassFlow;
+            }
+
+            // Adjust return node flows if the return node flows sum is less than the expected zone total return flow
+            if (totReturnFlow2 > 0.0) {
+                for (int returnNum = 1; returnNum <= numRetNodes; ++returnNum) {
+                    if (numRetNodes == 1) {
+                        // do nothing and set it to expected return flows
+                        int retNode = thisZoneEquip.ReturnNode(returnNum);
+                        FinalTotalReturnMassFlow = ExpTotalReturnMassFlow;
+                        if (retNode > 0) {
+                            DataLoopNode::Node(retNode).MassFlowRate = ExpTotalReturnMassFlow;
+                        }
+                    } else { // multiple return nodes
+                        Real64 newReturnFlow = 0.0;
+                        Real64 returnAdjFactor = ExpTotalReturnMassFlow / totReturnFlow2;
+                        int retNode = thisZoneEquip.ReturnNode(returnNum);
+                        Real64 curReturnFlow = DataLoopNode::Node(retNode).MassFlowRate;
+                        if (retNode > 0) {
+                                newReturnFlow = curReturnFlow * returnAdjFactor;
+                                FinalTotalReturnMassFlow += newReturnFlow;
+                                DataLoopNode::Node(retNode).MassFlowRate = newReturnFlow;
+                        }
+                    }
+                } 
+            } else {
+                FinalTotalReturnMassFlow = ExpTotalReturnMassFlow;
             }
         }
 
