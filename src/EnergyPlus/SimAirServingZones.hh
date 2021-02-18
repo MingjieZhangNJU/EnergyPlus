@@ -113,6 +113,8 @@ namespace SimAirServingZones {
 
     void InitAirLoops(EnergyPlusData &state, bool FirstHVACIteration); // TRUE if first full HVAC iteration in an HVAC timestep
 
+    void SetZoneMixingServingAirloopFlag(EnergyPlusData &state);
+
     void ConnectReturnNodes(EnergyPlusData &state);
 
     void SimAirLoops(EnergyPlusData &state, bool FirstHVACIteration, bool &SimZoneEquipment);

@@ -3947,6 +3947,7 @@ namespace EnergyPlus::ZoneEquipmentManager {
                     }
                 }
 
+                Real64 returnSchedFrac = 1.0;
                 // Include zone mixing mass flow rate
                 if (ZoneMassBalanceFlag(ZoneNum)) {
                     int NumRetNodes = state.dataZoneEquip->ZoneEquipConfig(ZoneNum).NumReturnNodes;
@@ -3967,7 +3968,6 @@ namespace EnergyPlus::ZoneEquipmentManager {
                     }
                     CalcZoneMixingFlowRateOfReceivingZone(ZoneNum, ZoneMixingAirMassFlowRate);
                     ZoneMixingNetAirMassFlowRate = MassConservation(ZoneNum).MixingMassFlowRate - MassConservation(ZoneNum).MixingSourceMassFlowRate;
-
                 }
 
                 ZoneNode = state.dataZoneEquip->ZoneEquipConfig(ZoneNum).ZoneNode;
@@ -3989,7 +3989,7 @@ namespace EnergyPlus::ZoneEquipmentManager {
                     }
                 } else {
                     state.dataZoneEquip->ZoneEquipConfig(ZoneNum).ExcessZoneExh = 0.0;
-                    StdTotalReturnMassFlow = max(0.0, StdTotalReturnMassFlow);
+                    StdTotalReturnMassFlow = max(0.0, returnSchedFrac * StdTotalReturnMassFlow);
                 }
 
                 Real64 FinalTotalReturnMassFlow = 0;
@@ -4013,8 +4013,8 @@ namespace EnergyPlus::ZoneEquipmentManager {
                                     Infiltration(MassConservation(ZoneNum).InfiltrationPtr).MassFlowRate =
                                         max(0.0, Infiltration(MassConservation(ZoneNum).InfiltrationPtr).MassFlowRate);
                                 } else {
-                                    MassConservation(ZoneNum).InfiltrationMassFlowRate =
-                                        Infiltration(MassConservation(ZoneNum).InfiltrationPtr).MassFlowRate;
+                                    MassConservation( ZoneNum ).InfiltrationMassFlowRate = 0.0;
+                                    Infiltration(MassConservation(ZoneNum).InfiltrationPtr).MassFlowRate = 0.0;
                                 }
                             } else if (ZoneAirMassFlow.InfiltrationTreatment == AddInfiltrationFlow) {
                                 if (ZoneInfiltrationMassFlowRate > ConvergenceTolerance) {
@@ -4233,7 +4233,7 @@ namespace EnergyPlus::ZoneEquipmentManager {
                     }
                     // if zone mass balance true, set to expected return flow
                     if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance ) {
-                        returnNodeMassFlow = returnSchedFrac * ExpTotalReturnMassFlow;
+                        if (thisAirLoopFlow.ZonesNotInSingleAirLoop) returnNodeMassFlow = ExpTotalReturnMassFlow;
                     }
                 } else {
                     returnNodeMassFlow = 0.0;
@@ -4266,8 +4266,13 @@ namespace EnergyPlus::ZoneEquipmentManager {
                             }
                         }
                         // if zone mass balance true, set to expected return flow
-                        if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance ) {
-                            returnNodeMassFlow = returnSchedFrac * ExpTotalReturnMassFlow; 
+                        if (DataHeatBalance::ZoneAirMassFlow.EnforceZoneMassBalance) {
+                            int airLoop = thisZoneEquip.ReturnNodeAirLoopNum(returnNum);
+                            if (airLoop > 0) {
+                                if (state.dataAirLoop->AirLoopFlow(airLoop).ZonesNotInSingleAirLoop) {
+                                    returnNodeMassFlow = ExpTotalReturnMassFlow;
+                                }
+                            }
                         }
                     }
                 }

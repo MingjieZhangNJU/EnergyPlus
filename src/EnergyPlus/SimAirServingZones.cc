@@ -2060,6 +2060,8 @@ namespace EnergyPlus::SimAirServingZones {
                 state.dataAirSystemsData->PrimaryAirSystems(AirLoopNum).CentralCoolCoilExists = FoundCentralCoolCoil;
             } // end of AirLoop loop
 
+            SetZoneMixingServingAirloopFlag(state);
+
         } // one time flag
 
         // Size the air loop branch air flows
@@ -2249,6 +2251,44 @@ namespace EnergyPlus::SimAirServingZones {
             }
 
         } // end loop over primary air systems
+    }
+
+    void SetZoneMixingServingAirloopFlag(EnergyPlusData &state)
+    {
+
+        // sets a flag to true if the zonemixing object's receiving and source zones
+        // are in a different airloop and used to enforce zone air mass flow balance
+
+        // process zone mixing objects to get air loop served
+        for (int loop = 1; loop <= DataHeatBalance::TotMixing; ++loop) {
+            int rZone = DataHeatBalance::Mixing(loop).ZonePtr;
+            int sZone = DataHeatBalance::Mixing(loop).FromZone;
+            // find airloop index of receiving zone
+            int receivingZoneAirLoopNum = 0.0;
+            for (int returnNum = 1; returnNum <= state.dataZoneEquip->ZoneEquipConfig(rZone).NumReturnNodes; ++returnNum) {
+                auto &thisZoneEquip(state.dataZoneEquip->ZoneEquipConfig(rZone));
+                int rairLoopNum = thisZoneEquip.ReturnNodeAirLoopNum(returnNum);
+                if (rairLoopNum > 0) {
+                    receivingZoneAirLoopNum = rairLoopNum;
+                    break;
+                }
+            }
+            // find airloop index of airloop of receiving zone
+            int sourceZoneAirLoopNum = 0.0;
+            for (int returnNum = 1; returnNum <= state.dataZoneEquip->ZoneEquipConfig(sZone).NumReturnNodes; ++returnNum) {
+                auto &thisZoneEquip(state.dataZoneEquip->ZoneEquipConfig(sZone));
+                int sairLoopNum = thisZoneEquip.ReturnNodeAirLoopNum(returnNum);
+                if (sairLoopNum > 0) {
+                    sourceZoneAirLoopNum = sairLoopNum;
+                    break;
+                }
+            }
+
+            // set the flag to true if the zones are not in the same airloop
+            if (receivingZoneAirLoopNum != sourceZoneAirLoopNum ) {
+                state.dataAirLoop->AirLoopFlow(receivingZoneAirLoopNum).ZonesNotInSingleAirLoop = true;
+            } 
+        }
     }
 
     void ConnectReturnNodes(EnergyPlusData &state)
